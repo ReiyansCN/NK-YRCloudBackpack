@@ -3,6 +3,7 @@ package com.yirankuma.yrcloudbackpack.EventListener;
 import cn.nukkit.Player;
 import cn.nukkit.event.EventHandler;
 import cn.nukkit.event.Listener;
+import cn.nukkit.item.Item;
 import com.yirankuma.yrcloudbackpack.Manager.InventoryManager;
 import com.yirankuma.yrcloudbackpack.YRCloudBackpack;
 import com.yirankuma.yrdatabase.event.PlayerDataInitializeEvent;
@@ -23,7 +24,13 @@ public class EventListener implements Listener {
 
         if (player != null) {
             // YRDatabase已经帮你判断好了，直接加载数据
-            inventoryManager.loadPlayerInventory(player);
+            if(YRCloudBackpack.getInstance().delay > 0){
+                YRCloudBackpack.getInstance().getServer().getScheduler().scheduleDelayedTask(YRCloudBackpack.getInstance(), () -> {
+                    inventoryManager.loadPlayerInventory(player);
+                }, YRCloudBackpack.getInstance().delay * 20);
+            }else{
+                inventoryManager.loadPlayerInventory(player);
+            }
         }
     }
 

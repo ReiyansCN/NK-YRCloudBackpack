@@ -10,14 +10,19 @@ public class YRCloudBackpack extends PluginBase {
     private static YRCloudBackpack instance;
     private Config config;
     private InventoryManager inventoryManager;
+
+    public int delay = 0;
     
     @Override
     public void onEnable() {
         instance = this;
-        
+
         // 初始化配置文件
         saveDefaultConfig();
         config = getConfig();
+
+        //初始化加载数据延迟
+        delay = config.getInt("load_delay");
         
         // 检测是否启用了 YRDatabase 插件
         if (getServer().getPluginManager().getPlugin("YRDatabase") == null) {
