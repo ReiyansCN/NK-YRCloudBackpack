@@ -1,2 +1,2 @@
 inventory_schema_name: player_inventory
-load_delay: 5 #Some plugins need (seconds)
+load_delay: 0 #Some plugins need (seconds)
