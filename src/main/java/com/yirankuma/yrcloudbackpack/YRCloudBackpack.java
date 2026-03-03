@@ -4,7 +4,8 @@ import cn.nukkit.plugin.PluginBase;
 import cn.nukkit.utils.Config;
 import com.yirankuma.yrcloudbackpack.EventListener.EventListener;
 import com.yirankuma.yrcloudbackpack.Manager.InventoryManager;
-import com.yirankuma.yrdatabase.YRDatabase;
+import com.yirankuma.yrdatabase.api.DatabaseManager;
+import com.yirankuma.yrdatabase.nukkit.YRDatabaseNukkit;
 
 public class YRCloudBackpack extends PluginBase {
     private static YRCloudBackpack instance;
@@ -30,9 +31,17 @@ public class YRCloudBackpack extends PluginBase {
             getServer().getPluginManager().disablePlugin(this);
             return;
         }
-        
-        // 初始化背包管理器
-        inventoryManager = new InventoryManager(this);
+
+        DatabaseManager dbManager = YRDatabaseNukkit.getDatabaseManager();
+        if ( dbManager == null) {
+            getLogger().error("YRDatabase is not available! Make sure YRDatabase is installed and enabled.");
+            getServer().getPluginManager().disablePlugin(this);
+            return;
+        }
+
+        // 初始化背包数据库管理器
+        inventoryManager = new InventoryManager(this,dbManager);
+
         
         getLogger().info("YRCloudBackpack 插件已启用");
         getLogger().info("使用数据表名称: " + getInventorySchemaName());

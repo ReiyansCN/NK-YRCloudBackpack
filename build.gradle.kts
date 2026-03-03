@@ -18,8 +18,8 @@ dependencies {
     // Nukkit 核心依赖
     compileOnly(fileTree(mapOf("dir" to "libs", "include" to listOf("*.jar"))))
 
-    // 从 JitPack 引入 YRDatabase 依赖
-    implementation("com.github.MufHead.YRDatabase:yrdatabase-nukkit:v1.0.4")
+    // 从 JitPack 引入 YRDatabase-api 依赖
+    implementation("com.github.MufHead.YRDatabase:yrdatabase-nukkit:v2.0.0")
 
     testImplementation(platform("org.junit:junit-bom:5.9.1"))
     testImplementation("org.junit.jupiter:junit-jupiter")
@@ -31,14 +31,14 @@ tasks.test {
 
 tasks.withType<JavaCompile> {
     options.encoding = "UTF-8"
-    sourceCompatibility = "18"
-    targetCompatibility = "18"
+    sourceCompatibility = "21"
+    targetCompatibility = "21"
 }
 
 tasks.jar {
     archiveBaseName.set("YRCloudBackpack")
     archiveVersion.set("")
-    destinationDirectory.set(file("E:/ServerPLUGINS/网易NK服务器插件"))
+    destinationDirectory.set(file("C:/迅雷下载"))
 
     doFirst {
         destinationDirectory.get().asFile.mkdirs()

@@ -5,75 +5,122 @@ import cn.nukkit.Server;
 import cn.nukkit.inventory.PlayerInventory;
 import cn.nukkit.inventory.PlayerOffhandInventory;
 import cn.nukkit.item.Item;
-import cn.nukkit.item.StringItem;
-import cn.nukkit.nbt.tag.CompoundTag;
 import com.google.gson.Gson;
+import com.yirankuma.yrcloudbackpack.Schemas.Schemas;
 import com.yirankuma.yrcloudbackpack.YRCloudBackpack;
-import com.yirankuma.yrdatabase.YRDatabase;
+import com.yirankuma.yrdatabase.api.CacheStrategy;
+import com.yirankuma.yrdatabase.api.DatabaseManager;
 
-import java.sql.Timestamp;
-import java.util.Arrays;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
-
-import static com.yirankuma.yrcloudbackpack.Schemas.Schemas.*;
+import java.util.concurrent.CompletableFuture;
 
 public class InventoryManager {
     private final YRCloudBackpack plugin;
     private final String schemaName;
+    private final DatabaseManager dbManager;
 
-    public InventoryManager(YRCloudBackpack plugin) {
+    public InventoryManager(YRCloudBackpack plugin, DatabaseManager dbManager) {
         this.plugin = plugin;
         this.schemaName = plugin.getInventorySchemaName();
+        this.dbManager = dbManager;
     }
 
-    public void loadPlayerInventory(Player player) {
-        YRDatabase.getDatabaseManager().smartGet(schemaName, player, inventorySchema)
-                .thenAccept(data -> {
-                    if (data != null && data.containsKey("inventory_data")) {
-                        // 有缓存数据，加载到玩家背包
-                        String inventoryJson = (String) data.get("inventory_data");
-                        String armorJson = (String) data.get("armor_data");
-                        String offhandJson = (String) data.get("offhand_data");
+//    public CompletableFuture<Void> initialize() {
+//        CompletableFuture<Void> result = CompletableFuture.completedFuture(null);
+//        // Create player_inventory table
+//        result = result.thenCompose(v ->
+//                dbManager.ensureTable("player_inventory", Schemas.inventorySchema())
+//                        .thenAccept(created -> {
+//                            if (created) {
+//                                plugin.getLogger().info("Created player_inventory table successfully!");
+//                            }
+//                        })
+//        );
+//
+//        return result;
+//    }
+public CompletableFuture<Void> initialize() {
+    CompletableFuture<Void> result = CompletableFuture.completedFuture(null);
 
-                        loadInventoryFromJson(player, inventoryJson, armorJson, offhandJson);
+    // Create player_inventory table
+    result = result.thenCompose(v -> {
+        return dbManager.ensureTable(this.schemaName, Schemas.inventorySchema())
+                .thenAccept(created -> {
+                    if (created) {
+                        plugin.getLogger().info("Created player_inventory table successfully!");
                     } else {
-                        // 没有缓存数据，保存当前背包作为初始数据
-                        savePlayerInventory(player);
+                        plugin.getLogger().warning("player_inventory has existed or created failure!");
                     }
                 })
-                .exceptionally(throwable -> {
-                    Server.getInstance().getLogger().error("加载玩家背包失败: " + player.getName(), throwable);
+                .exceptionally(ex -> {
+                    plugin.getLogger().error("create table player_inventory error: " + ex.getMessage());
+                    ex.printStackTrace();
                     return null;
                 });
+    });
+
+    return result;
+}
+
+    public void loadPlayerInventory(Player player,String uid) {
+        dbManager.get(this.schemaName, uid)
+            .thenAccept(optional -> {optional.ifPresent(data -> {
+                if(data != null && data.containsKey("player_name")){
+                    // 有缓存数据，加载到玩家背包
+                    String inventoryJson = (String) data.get("inventory_data");
+                    String armorJson = (String) data.get("armor_data");
+                    String offhandJson = (String) data.get("offhand_data");
+
+                    loadInventoryFromJson(player, inventoryJson, armorJson, offhandJson);
+
+                    Server.getInstance().getLogger().info("玩家 "+player.getName()+" 的背包数据已同步完毕!");
+                    player.sendMessage("您的背包数据已从云端同步完毕!");
+                }else{
+                    // 新玩家 没有缓存数据，保存当前背包作为初始数据
+                    Server.getInstance().getLogger().info("玩家 "+player.getName()+" 首次来到本服务器!正在保存其背包数据至缓存!");
+                    savePlayerInventory(player,uid,CacheStrategy.CACHE_ONLY);
+                }
+            });
+        })
+        .exceptionally(throwable -> {
+            Server.getInstance().getLogger().error("加载玩家 "+player.getName()+" 背包数据失败!", throwable);
+            return null;
+        });
     }
 
-    public void savePlayerInventory(Player player) {
+    public void
+    savePlayerInventory(Player player,String uid,CacheStrategy cacheStrategy) {
         String playerName = player.getName(); // 获取玩家名称
         String inventoryJson = serializeInventoryToJson(player.getInventory());
         String armorJson = serializeArmorToJson(player.getInventory());
         String offhandJson = serializeOffhandToJson(player.getOffhandInventory());
-
+        // 避免地图缓存
+        player.getInventory().clearAll();
+        player.getOffhandInventory().clearAll();
         // 包含所有需要保存的数据
         Map<String, Object> inventoryData = Map.of(
+                "id",uid,
                 "player_name", playerName,  // 添加玩家名称
                 "inventory_data", inventoryJson,
                 "armor_data", armorJson,
                 "offhand_data", offhandJson
-                // "last_updated", new Timestamp(System.currentTimeMillis())  // 使用Timestamp对象
-                // last_server 暂时不写，按你的要求
         );
 
-        // 缓存设置为永久（-1）
-        YRDatabase.getDatabaseManager().smartSet(schemaName, player, inventoryData, inventorySchema, -1)
+        dbManager.set(this.schemaName, uid, inventoryData,cacheStrategy)
                 .thenAccept(success -> {
-                    if (!success) {
-                        Server.getInstance().getLogger().warning("保存玩家背包到缓存失败: " + player.getName());
+                    if (success) {
+                        if(cacheStrategy.equals(CacheStrategy.CACHE_ONLY)){
+                            Server.getInstance().getLogger().info("玩家仅转服，保存玩家 " + player.getName() +" 背包数据到缓存!");
+                        }else if(cacheStrategy.equals(CacheStrategy.CACHE_FIRST)){
+                            Server.getInstance().getLogger().info("玩家已退服，保存玩家 " + player.getName() +" 背包数据到缓存和数据库!");
+                        }
+                    }else{
+                        Server.getInstance().getLogger().warning("保存玩家 " + player.getName() +" 背包数据失败! 策略: " + cacheStrategy);
                     }
                 })
                 .exceptionally(throwable -> {
-                    Server.getInstance().getLogger().error("保存玩家背包失败: " + player.getName(), throwable);
+                    Server.getInstance().getLogger().error("保存玩家 " + player.getName()+" 背包数据失败!", throwable);
                     return null;
                 });
     }
@@ -339,21 +386,5 @@ public class InventoryManager {
             Server.getInstance().getLogger().error("创建物品失败", e);
             return null;
         }
-    }
-
-    public void persistPlayerInventory(Player player) {
-        YRDatabase.getDatabaseManager().persistAndClearCache(schemaName, player, inventorySchema)
-                .thenAccept(success -> {
-                    if (!success) {
-                        // 假如redis未开启，则忽略失败
-                        if (YRDatabase.getDatabaseManager().isRedisConnected()) {
-                            Server.getInstance().getLogger().warning("持久化玩家背包失败: " + player.getName());
-                        }
-                    }
-                })
-                .exceptionally(throwable -> {
-                    Server.getInstance().getLogger().error("持久化玩家背包异常: " + player.getName(), throwable);
-                    return null;
-                });
     }
 }
