@@ -57,16 +57,13 @@ public CompletableFuture<Void> initialize() {
                     }else{
                         dbManager.get(this.schemaName, uid)
                                 .thenAccept(optional -> optional.ifPresent(data -> {
-                                    Server.getInstance().getLogger().info(data.toString());
-                                    if(data.get("inventory_data") == null){
-                                        // 有缓存数据，加载到玩家背包
-                                        String inventoryJson = (String) data.get("inventory_data");
-                                        String armorJson = (String) data.get("armor_data");
-                                        String offhandJson = (String) data.get("offhand_data");
-                                        loadInventoryFromJson(player, inventoryJson, armorJson, offhandJson);
-                                        Server.getInstance().getLogger().info("玩家 "+player.getName()+" 的背包数据已同步完毕!");
-                                        player.sendMessage("您的背包数据已从云端同步完毕!");
-                                    }
+                                    // 有缓存数据，加载到玩家背包
+                                    String inventoryJson = (String) data.get("inventory_data");
+                                    String armorJson = (String) data.get("armor_data");
+                                    String offhandJson = (String) data.get("offhand_data");
+                                    loadInventoryFromJson(player, inventoryJson, armorJson, offhandJson);
+                                    Server.getInstance().getLogger().info("玩家 "+player.getName()+" 的背包数据已同步完毕!");
+                                    player.sendMessage("您的背包数据已从云端同步完毕!");
                                 }))
                                 .exceptionally(throwable -> {
                                     Server.getInstance().getLogger().error("加载玩家 "+player.getName()+" 背包数据失败!", throwable);
