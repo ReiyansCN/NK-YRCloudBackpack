@@ -41,10 +41,12 @@ public class YRCloudBackpack extends PluginBase {
 
         // 初始化背包数据库管理器
         inventoryManager = new InventoryManager(this,dbManager);
-
         
         getLogger().info("YRCloudBackpack 插件已启用");
         getLogger().info("使用数据表名称: " + getInventorySchemaName());
+
+        //延迟创建表(如果没有)
+        YRCloudBackpack.getInstance().getServer().getScheduler().scheduleDelayedTask(YRCloudBackpack.getInstance(), () -> inventoryManager.initialize(),  60);
         
         getServer().getPluginManager().registerEvents(new EventListener(), this);
     }

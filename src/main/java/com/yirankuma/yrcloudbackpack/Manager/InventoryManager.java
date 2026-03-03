@@ -26,67 +26,54 @@ public class InventoryManager {
         this.dbManager = dbManager;
     }
 
-//    public CompletableFuture<Void> initialize() {
-//        CompletableFuture<Void> result = CompletableFuture.completedFuture(null);
-//        // Create player_inventory table
-//        result = result.thenCompose(v ->
-//                dbManager.ensureTable("player_inventory", Schemas.inventorySchema())
-//                        .thenAccept(created -> {
-//                            if (created) {
-//                                plugin.getLogger().info("Created player_inventory table successfully!");
-//                            }
-//                        })
-//        );
-//
-//        return result;
-//    }
+
 public CompletableFuture<Void> initialize() {
     CompletableFuture<Void> result = CompletableFuture.completedFuture(null);
-
-    // Create player_inventory table
-    result = result.thenCompose(v -> {
-        return dbManager.ensureTable(this.schemaName, Schemas.inventorySchema())
-                .thenAccept(created -> {
-                    if (created) {
-                        plugin.getLogger().info("Created player_inventory table successfully!");
-                    } else {
-                        plugin.getLogger().warning("player_inventory has existed or created failure!");
-                    }
-                })
-                .exceptionally(ex -> {
-                    plugin.getLogger().error("create table player_inventory error: " + ex.getMessage());
-                    ex.printStackTrace();
-                    return null;
-                });
-    });
+    // Create or check player_inventory table
+    result = result.thenCompose(v -> dbManager.ensureTable(this.schemaName, Schemas.inventorySchema())
+            .thenAccept(ensured -> {
+                if (ensured) {
+                    plugin.getLogger().info("玩家背包数据表就绪!");
+                } else {
+                    plugin.getLogger().warning("玩家背包数据表初始化失败!");
+                }
+            })
+            .exceptionally(ex -> {
+                plugin.getLogger().error("玩家背包数据表初始化错误: " + ex.getMessage());
+                ex.printStackTrace();
+                return null;
+            }));
 
     return result;
 }
 
     public void loadPlayerInventory(Player player,String uid) {
-        dbManager.get(this.schemaName, uid)
-            .thenAccept(optional -> {optional.ifPresent(data -> {
-                if(data != null && data.containsKey("player_name")){
-                    // 有缓存数据，加载到玩家背包
-                    String inventoryJson = (String) data.get("inventory_data");
-                    String armorJson = (String) data.get("armor_data");
-                    String offhandJson = (String) data.get("offhand_data");
-
-                    loadInventoryFromJson(player, inventoryJson, armorJson, offhandJson);
-
-                    Server.getInstance().getLogger().info("玩家 "+player.getName()+" 的背包数据已同步完毕!");
-                    player.sendMessage("您的背包数据已从云端同步完毕!");
-                }else{
-                    // 新玩家 没有缓存数据，保存当前背包作为初始数据
-                    Server.getInstance().getLogger().info("玩家 "+player.getName()+" 首次来到本服务器!正在保存其背包数据至缓存!");
-                    savePlayerInventory(player,uid,CacheStrategy.CACHE_ONLY);
-                }
-            });
-        })
-        .exceptionally(throwable -> {
-            Server.getInstance().getLogger().error("加载玩家 "+player.getName()+" 背包数据失败!", throwable);
-            return null;
-        });
+        dbManager.exists(this.schemaName, uid)
+                .thenAccept(exists -> {
+                    if (!exists) {
+                        // 新玩家 没有缓存数据，保存当前背包作为初始数据
+                        Server.getInstance().getLogger().info("玩家 "+player.getName()+" 首次来到本服务器!正在保存其背包数据至缓存!");
+                        savePlayerInventory(player,uid,CacheStrategy.CACHE_ONLY);
+                    }else{
+                        dbManager.get(this.schemaName, uid)
+                                .thenAccept(optional -> optional.ifPresent(data -> {
+                                    Server.getInstance().getLogger().info(data.toString());
+                                    if(data.get("inventory_data") == null){
+                                        // 有缓存数据，加载到玩家背包
+                                        String inventoryJson = (String) data.get("inventory_data");
+                                        String armorJson = (String) data.get("armor_data");
+                                        String offhandJson = (String) data.get("offhand_data");
+                                        loadInventoryFromJson(player, inventoryJson, armorJson, offhandJson);
+                                        Server.getInstance().getLogger().info("玩家 "+player.getName()+" 的背包数据已同步完毕!");
+                                        player.sendMessage("您的背包数据已从云端同步完毕!");
+                                    }
+                                }))
+                                .exceptionally(throwable -> {
+                                    Server.getInstance().getLogger().error("加载玩家 "+player.getName()+" 背包数据失败!", throwable);
+                                    return null;
+                                });
+                    }
+                });
     }
 
     public void

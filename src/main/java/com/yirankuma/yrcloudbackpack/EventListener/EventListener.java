@@ -22,14 +22,6 @@ public class EventListener implements Listener {
     public void onPlayerRealJoin(NukkitPlayerDataInitEvent event) {
         String uid = event.getPlayerId();
         Player player = Server.getInstance().getPlayer(event.getPlayerName());
-        // 初始化数据表
-        inventoryManager.initialize()
-                .thenRun(() -> YRCloudBackpack.getInstance().getLogger().info("Player_inventory database tables initialized"))
-                .exceptionally(e -> {
-                    YRCloudBackpack.getInstance().getLogger().error("Failed to initialize database tables: " + e.getMessage());
-                    return null;
-                });
-
         if (player != null) {
             // YRDatabase已经帮你判断好了，直接加载数据
             if (YRCloudBackpack.getInstance().delay > 0) {
@@ -56,9 +48,3 @@ public class EventListener implements Listener {
         }
     }
 }
-//    @EventHandler
-//        DataPacket dp = event.getPacket();
-//        if (dp instanceof NeteaseLoginPacket){
-//            System.out.println(((NeteaseLoginPacket) dp).proxyUid);
-//        }
-//    }
